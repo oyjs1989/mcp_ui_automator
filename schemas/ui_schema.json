@@ -1,0 +1,162 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Android UI Automator API Schema",
+    "definitions": {
+        "UIElement": {
+            "type": "object",
+            "properties": {
+                "resource_id": {
+                    "type": "string",
+                    "description": "Android资源ID，最稳定的元素标识符"
+                },
+                "text": {
+                    "type": "string",
+                    "description": "用户可见的文本内容"
+                },
+                "class_name": {
+                    "type": "string",
+                    "description": "元素类名，如android.widget.Button"
+                },
+                "content_desc": {
+                    "type": "string",
+                    "description": "无障碍内容描述"
+                },
+                "bounds": {
+                    "$ref": "#/definitions/Bounds",
+                    "description": "元素在屏幕上的边界坐标"
+                },
+                "clickable": {
+                    "type": "boolean",
+                    "description": "是否可点击"
+                },
+                "scrollable": {
+                    "type": "boolean",
+                    "description": "是否可滚动"
+                },
+                "checkable": {
+                    "type": "boolean",
+                    "description": "是否可选中"
+                },
+                "checked": {
+                    "type": "boolean",
+                    "description": "是否已选中"
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "是否启用"
+                },
+                "focused": {
+                    "type": "boolean",
+                    "description": "是否获得焦点"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/UIElement"
+                    },
+                    "description": "子元素列表"
+                }
+            }
+        },
+        "Bounds": {
+            "type": "object",
+            "properties": {
+                "left": {
+                    "type": "integer"
+                },
+                "top": {
+                    "type": "integer"
+                },
+                "right": {
+                    "type": "integer"
+                },
+                "bottom": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+            ]
+        },
+        "PageSource": {
+            "type": "object",
+            "properties": {
+                "root": {
+                    "$ref": "#/definitions/UIElement",
+                    "description": "UI树的根元素"
+                },
+                "timestamp": {
+                    "type": "integer",
+                    "description": "获取时间戳(毫秒)"
+                },
+                "package_name": {
+                    "type": "string",
+                    "description": "当前应用包名"
+                },
+                "activity": {
+                    "type": "string",
+                    "description": "当前Activity名称"
+                },
+                "screen_size": {
+                    "$ref": "#/definitions/Bounds",
+                    "description": "屏幕尺寸"
+                }
+            },
+            "required": [
+                "root",
+                "timestamp"
+            ]
+        },
+        "ElementSelector": {
+            "type": "object",
+            "description": "元素选择器，支持多种定位方式",
+            "properties": {
+                "resource_id": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "text_contains": {
+                    "type": "string"
+                },
+                "class_name": {
+                    "type": "string"
+                },
+                "content_desc": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "bounds": {
+                    "$ref": "#/definitions/Bounds"
+                }
+            }
+        },
+        "ActionResponse": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "element_found": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "success",
+                "timestamp"
+            ]
+        }
+    }
+}

@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">UI Automator MCP</string>
+    <string name="notification_channel_name">UI Automator Service</string>
+    <string name="notification_channel_description">UI自动化服务运行状态</string>
+    <string name="notification_title">UI Automator 服务运行中</string>
+    <string name="notification_stop_action">停止服务</string>
+    
+    <!-- API相关 -->
+    <string name="api_error_element_not_found">元素未找到</string>
+    <string name="api_error_timeout">操作超时</string>
+    <string name="api_error_invalid_selector">无效的选择器</string>
+    <string name="api_error_operation_failed">操作失败</string>
+    <string name="api_error_service_error">服务错误</string>
+    
+    <!-- UI文本 -->
+    <string name="status_running">运行中</string>
+    <string name="status_stopped">已停止</string>
+    <string name="permissions_granted">已授权</string>
+    <string name="permissions_needed">需要权限</string>
+    <string name="server_starting">正在启动服务</string>
+    <string name="server_start_failed">启动服务失败</string>
+    <string name="server_stopped">服务已停止</string>
+    <string name="no_browser">无法打开浏览器</string>
+</resources>

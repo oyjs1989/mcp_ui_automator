@@ -1,0 +1,18 @@
+{
+    "mcpServers": {
+        "android-ui-automator": {
+            "command": "python",
+            "args": [
+                "/path/to/mcp_ui_automator/mcp_server/main.py",
+                "--android-host",
+                "192.168.1.100",
+                "--android-port",
+                "8080"
+            ],
+            "cwd": "/path/to/mcp_ui_automator/mcp_server",
+            "env": {
+                "PYTHONPATH": "/path/to/mcp_ui_automator/mcp_server"
+            }
+        }
+    }
+}
