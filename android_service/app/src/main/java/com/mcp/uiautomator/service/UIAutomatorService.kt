@@ -117,14 +117,27 @@ class UIAutomatorService : Service() {
                 httpServer = HttpServer(this@UIAutomatorService, port)
                 
                 debugLogger.info("Starting HttpServer")
-                httpServer?.start()
+                val success = httpServer?.start() ?: false
                 
+                if (success) {
                 isServerRunning = true
-                debugLogger.logServiceStatus("RUNNING", "Server started successfully on port $port")
+                    debugLogger.logServiceStatus("RUNNING", "Server started successfully on port $port")
                 
                 withContext(Dispatchers.Main) {
                     startForeground(NOTIFICATION_ID, createNotification())
-                    debugLogger.info("Foreground service started with notification")
+                        debugLogger.info("Foreground service started with notification")
+                    }
+                } else {
+                    debugLogger.error("Failed to start HTTP server on port $port")
+                    isServerRunning = false
+                    httpServer = null
+                    
+                    // 尝试使用备用端口
+                    val backupPort = findAvailablePort(port)
+                    if (backupPort != null) {
+                        debugLogger.info("Trying backup port: $backupPort")
+                        startServer(backupPort)
+                    }
                 }
             } catch (e: Exception) {
                 debugLogger.error("Failed to start server", e)
@@ -151,11 +164,11 @@ class UIAutomatorService : Service() {
         debugLogger.info("Stopping HTTP server")
         
         try {
-            httpServer?.stop()
-            httpServer = null
-            isServerRunning = false
-            
-            stopForeground(STOP_FOREGROUND_REMOVE)
+        httpServer?.stop()
+        httpServer = null
+        isServerRunning = false
+        
+        stopForeground(STOP_FOREGROUND_REMOVE)
             debugLogger.logServiceStatus("STOPPED", "Server stopped successfully")
         } catch (e: Exception) {
             debugLogger.error("Error stopping server", e)
@@ -239,20 +252,20 @@ class UIAutomatorService : Service() {
         
         val serverUrl = getServerUrl() ?: "http://localhost:$currentPort"
         
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("UI Automator 服务运行中")
-            .setContentText("服务地址: $serverUrl")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止服务", stopPendingIntent)
-            .setOngoing(true)
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-        }
-        
+                    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("UI Automator 服务运行中")
+                .setContentText("服务地址: $serverUrl")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentIntent(pendingIntent)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止服务", stopPendingIntent)
+                .setOngoing(true)
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            }
+            
         debugLogger.debug("Notification created with URL: $serverUrl")
-        return builder.build()
+            return builder.build()
     }
     
     /**
@@ -301,5 +314,28 @@ class UIAutomatorService : Service() {
             debugLogger.error("Failed to get local IP address", e)
             return null
         }
+    }
+    
+    /**
+     * 查找可用端口
+     */
+    private fun findAvailablePort(startPort: Int): Int? {
+        debugLogger.info("Finding available port starting from $startPort")
+        
+        for (port in startPort + 1..startPort + 100) {
+            if (port > 65535) break
+            
+            try {
+                val socket = java.net.ServerSocket(port)
+                socket.close()
+                debugLogger.info("Found available port: $port")
+                return port
+        } catch (e: Exception) {
+                debugLogger.debug("Port $port is not available")
+            }
+        }
+        
+        debugLogger.warn("No available port found in range ${startPort + 1}-${minOf(startPort + 100, 65535)}")
+        return null
     }
 }

@@ -11,6 +11,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.IBinder
 import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +29,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var debugLogger: DebugLogger
     private val handler = Handler(Looper.getMainLooper())
     private var isLogUpdateRunning = false
+    
+    companion object {
+        private const val PREF_NAME = "ui_automator_prefs"
+        private const val KEY_LAST_PORT = "last_port"
+        private const val DEFAULT_PORT = "8080"
+    }
     
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -56,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         
         setupUI()
         checkPermissions()
+        loadLastPort()
     }
     
     override fun onStart() {
@@ -96,22 +105,18 @@ class MainActivity : AppCompatActivity() {
         binding.apply {
             // 启动服务按钮
             buttonStartService.setOnClickListener {
-                val portText = editTextPort.text.toString()
-                val port = if (portText.isNotEmpty()) {
-                    portText.toIntOrNull() ?: 8080
-                } else {
-                    8080
+                startServiceWithCurrentPort()
+            }
+            
+            // 端口输入框回车监听
+            editTextPort.setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE || 
+                    actionId == EditorInfo.IME_ACTION_GO) {
+                    startServiceWithCurrentPort()
+                    hideKeyboard()
+                    return@setOnEditorActionListener true
                 }
-                
-                // 验证端口号范围
-                if (port < 1024 || port > 65535) {
-                    Toast.makeText(this, "端口号必须在1024-65535之间", Toast.LENGTH_SHORT).show()
-                    debugLogger.warn("Invalid port number: $port")
-                    return@setOnClickListener
-                }
-                
-                debugLogger.info("User clicked start service button, port: $port")
-                startUIAutomatorService(port)
+                false
             }
             
             // 停止服务按钮
@@ -166,8 +171,8 @@ class MainActivity : AppCompatActivity() {
                 exportLogs()
             }
             
-            // 设置默认端口
-            editTextPort.setText("8080")
+            // 设置默认端口（会在loadLastPort中加载上次保存的端口）
+            editTextPort.setText(DEFAULT_PORT)
         }
         
         updateUI()
@@ -407,6 +412,72 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             debugLogger.error("Failed to export logs", e)
             Toast.makeText(this, "导出日志失败: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+    
+    /**
+     * 启动服务并保存端口号
+     */
+    private fun startServiceWithCurrentPort() {
+        val portText = binding.editTextPort.text.toString()
+        val port = if (portText.isNotEmpty()) {
+            portText.toIntOrNull() ?: 8080
+        } else {
+            8080
+        }
+        
+        // 验证端口号范围
+        if (port < 1024 || port > 65535) {
+            Toast.makeText(this@MainActivity, "端口号必须在1024-65535之间", Toast.LENGTH_SHORT).show()
+            debugLogger.warn("Invalid port number: $port")
+            return
+        }
+        
+        // 保存端口号
+        savePort(port.toString())
+        
+        debugLogger.info("User clicked start service button, port: $port")
+        startUIAutomatorService(port)
+    }
+    
+    /**
+     * 保存端口号到SharedPreferences
+     */
+    private fun savePort(port: String) {
+        try {
+            val sharedPrefs = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            sharedPrefs.edit().putString(KEY_LAST_PORT, port).apply()
+            debugLogger.info("Port saved: $port")
+        } catch (e: Exception) {
+            debugLogger.error("Failed to save port", e)
+        }
+    }
+    
+    /**
+     * 加载上次保存的端口号
+     */
+    private fun loadLastPort() {
+        try {
+            val sharedPrefs = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            val lastPort = sharedPrefs.getString(KEY_LAST_PORT, DEFAULT_PORT) ?: DEFAULT_PORT
+            binding.editTextPort.setText(lastPort)
+            debugLogger.info("Last port loaded: $lastPort")
+        } catch (e: Exception) {
+            debugLogger.error("Failed to load last port", e)
+            binding.editTextPort.setText(DEFAULT_PORT)
+        }
+    }
+    
+    /**
+     * 隐藏键盘
+     */
+    private fun hideKeyboard() {
+        try {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(binding.editTextPort.windowToken, 0)
+            debugLogger.debug("Keyboard hidden")
+        } catch (e: Exception) {
+            debugLogger.error("Failed to hide keyboard", e)
         }
     }
 }

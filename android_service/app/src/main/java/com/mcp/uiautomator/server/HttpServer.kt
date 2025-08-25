@@ -41,8 +41,8 @@ class HttpServer(
     /**
      * 启动HTTP服务器
      */
-    suspend fun start() {
-        try {
+    suspend fun start(): Boolean {
+        return try {
             debugLogger.info("Starting HTTP server on port $port")
             
             server = embeddedServer(Netty, port = port) {
@@ -51,9 +51,13 @@ class HttpServer(
             
             server?.start(wait = false)
             debugLogger.logServiceStatus("HTTP_SERVER_STARTED", "Server listening on port $port")
+            true
         } catch (e: Exception) {
-            debugLogger.error("Failed to start HTTP server", e)
-            throw e
+            debugLogger.error("Failed to start HTTP server on port $port", e)
+            if (e.message?.contains("Address already in use") == true) {
+                debugLogger.error("Port $port is already in use")
+            }
+            false
         }
     }
     
@@ -335,7 +339,7 @@ class HttpServer(
             get("/debug/logs") {
                 try {
                     debugLogger.logApiCall("GET", "/debug/logs")
-                    val logContent = debugLogger.getLogContent(100)
+                    val logContent = debugLogger.getLogContent(500) // 增加日志行数
                     debugLogger.logApiCall("GET", "/debug/logs", null, 200)
                     call.respondText(logContent, ContentType.Text.Plain)
                 } catch (e: Exception) {
@@ -346,6 +350,48 @@ class HttpServer(
                         ActionResponse(
                             success = false,
                             message = "Failed to get debug logs: ${e.message}",
+                            errorCode = ErrorCodes.SERVICE_ERROR
+                        )
+                    )
+                }
+            }
+            
+            // 调试日志端点 - 实时日志
+            get("/debug/logs/live") {
+                try {
+                    debugLogger.logApiCall("GET", "/debug/logs/live")
+                    val logContent = debugLogger.getLogContent(1000) // 更多实时日志
+                    debugLogger.logApiCall("GET", "/debug/logs/live", null, 200)
+                    call.respondText(logContent, ContentType.Text.Plain)
+                } catch (e: Exception) {
+                    debugLogger.error("Failed to get live debug logs", e)
+                    debugLogger.logApiCall("GET", "/debug/logs/live", null, 500)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        ActionResponse(
+                            success = false,
+                            message = "Failed to get live debug logs: ${e.message}",
+                            errorCode = ErrorCodes.SERVICE_ERROR
+                        )
+                    )
+                }
+            }
+            
+            // 调试日志端点 - 清除日志
+            post("/debug/logs/clear") {
+                try {
+                    debugLogger.logApiCall("POST", "/debug/logs/clear")
+                    debugLogger.clearLogs()
+                    debugLogger.logApiCall("POST", "/debug/logs/clear", null, 200)
+                    call.respond(HttpStatusCode.OK, mapOf("success" to true, "message" to "Logs cleared"))
+                } catch (e: Exception) {
+                    debugLogger.error("Failed to clear debug logs", e)
+                    debugLogger.logApiCall("POST", "/debug/logs/clear", null, 500)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        ActionResponse(
+                            success = false,
+                            message = "Failed to clear debug logs: ${e.message}",
                             errorCode = ErrorCodes.SERVICE_ERROR
                         )
                     )
@@ -403,9 +449,15 @@ class HttpServer(
                         <div class="endpoint">
                             <div class="method">GET</div> /health - 健康检查
                         </div>
-                        <div class="endpoint">
-                            <div class="method">GET</div> /debug/logs - 获取调试日志
-                        </div>
+                                                 <div class="endpoint">
+                             <div class="method">GET</div> /debug/logs - 获取调试日志
+                         </div>
+                         <div class="endpoint">
+                             <div class="method">GET</div> /debug/logs/live - 获取实时调试日志
+                         </div>
+                         <div class="endpoint">
+                             <div class="method">POST</div> /debug/logs/clear - 清除调试日志
+                         </div>
                     </body>
                     </html>
                 """.trimIndent()
@@ -425,10 +477,10 @@ class HttpServer(
             appendLine("  <screen-info>")
             appendLine("    <package-name>${pageSource.packageName}</package-name>")
             appendLine("    <timestamp>${pageSource.timestamp}</timestamp>")
-            pageSource.screenSize?.let { screen ->
+            pageSource.screenSize?.let { screenSize ->
                 appendLine("    <screen-size>")
-                appendLine("      <width>${screen.width}</width>")
-                appendLine("      <height>${screen.height}</height>")
+                appendLine("      <width>${screenSize.width()}</width>")
+                appendLine("      <height>${screenSize.height()}</height>")
                 appendLine("    </screen-size>")
             }
             appendLine("  </screen-info>")
