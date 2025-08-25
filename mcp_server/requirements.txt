@@ -1,17 +1,17 @@
-# MCP服务器依赖
+# MCP server dependencies
 mcp>=0.8.0
 pydantic>=2.0.0
 
-# HTTP客户端
+# HTTP client
 aiohttp>=3.9.0
 
-# 异步支持 (内置于Python 3.7+)
+# Async support (built into Python 3.7+)
 # asyncio - built-in
 
-# 类型注解
+# Type annotations
 typing-extensions>=4.8.0
 
-# 测试依赖 (可选)
+# Test dependencies (optional)
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 unittest-xml-reporting>=3.2.0

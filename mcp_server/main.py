@@ -20,11 +20,13 @@ from mcp.server.stdio import stdio_server
 from server import UIAutomatorMCPServer
 
 # Configure logging
+import os
+log_file = os.path.join(os.path.dirname(__file__), 'mcp-ui-automator.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/tmp/mcp-ui-automator.log'),
+        logging.FileHandler(log_file),
         logging.StreamHandler(sys.stderr)
     ]
 )

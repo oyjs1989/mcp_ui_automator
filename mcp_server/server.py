@@ -356,16 +356,7 @@ class UIAutomatorMCPServer:
         
         async with ClientSession(read_stream, write_stream) as session:
             # Initialize the session
-            await session.initialize(
-                InitializationOptions(
-                    server_name="android-ui-automator",
-                    server_version="1.0.0",
-                    capabilities=session.get_server_capabilities(
-                        notification_options=None,
-                        experimental_capabilities={}
-                    )
-                )
-            )
+            await session.initialize()
             
             # Keep the server running
             await session.run_server()

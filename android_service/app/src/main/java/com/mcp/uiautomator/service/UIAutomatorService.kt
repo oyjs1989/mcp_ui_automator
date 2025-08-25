@@ -12,9 +12,11 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.mcp.uiautomator.MainActivity
 import com.mcp.uiautomator.R
+import com.mcp.uiautomator.core.DebugLogger
 import com.mcp.uiautomator.server.HttpServer
 import kotlinx.coroutines.*
 import java.net.InetAddress
@@ -42,6 +44,7 @@ class UIAutomatorService : Service() {
     private var serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isServerRunning = false
     private var currentPort = DEFAULT_PORT
+    private lateinit var debugLogger: DebugLogger
     
     // Binder for local service binding
     inner class LocalBinder : Binder() {
@@ -52,60 +55,82 @@ class UIAutomatorService : Service() {
     
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "UIAutomatorService created")
+        debugLogger = DebugLogger(this)
+        debugLogger.info("UIAutomatorService created")
         createNotificationChannel()
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        debugLogger.info("onStartCommand called with action: ${intent?.action}")
+        
         when (intent?.action) {
             ACTION_START_SERVER -> {
                 val port = intent.getIntExtra(EXTRA_PORT, DEFAULT_PORT)
+                debugLogger.info("Received START_SERVER action with port: $port")
                 startServer(port)
             }
             ACTION_STOP_SERVER -> {
+                debugLogger.info("Received STOP_SERVER action")
                 stopServer()
                 stopSelf()
+            }
+            else -> {
+                debugLogger.warn("Unknown action: ${intent?.action}")
             }
         }
         return START_STICKY
     }
     
     override fun onBind(intent: Intent?): IBinder {
+        debugLogger.info("Service bound")
         return binder
     }
     
     override fun onDestroy() {
         super.onDestroy()
+        debugLogger.info("UIAutomatorService destroyed")
         stopServer()
         serviceScope.cancel()
-        Log.d(TAG, "UIAutomatorService destroyed")
     }
     
     /**
      * 启动HTTP服务器
      */
     fun startServer(port: Int = DEFAULT_PORT) {
-        if (isServerRunning) {
-            Log.w(TAG, "Server is already running")
+        // 验证端口号
+        if (port < 1024 || port > 65535) {
+            debugLogger.error("Invalid port number: $port, must be between 1024-65535")
             return
         }
         
+        if (isServerRunning) {
+            debugLogger.warn("Server is already running on port $currentPort")
+            return
+        }
+        
+        debugLogger.info("Starting HTTP server on port $port")
         currentPort = port
         
         serviceScope.launch {
             try {
+                debugLogger.info("Creating HttpServer instance")
                 httpServer = HttpServer(this@UIAutomatorService, port)
+                
+                debugLogger.info("Starting HttpServer")
                 httpServer?.start()
                 
                 isServerRunning = true
+                debugLogger.logServiceStatus("RUNNING", "Server started successfully on port $port")
                 
                 withContext(Dispatchers.Main) {
                     startForeground(NOTIFICATION_ID, createNotification())
-                    Log.i(TAG, "HTTP Server started on port $port")
+                    debugLogger.info("Foreground service started with notification")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start server", e)
+                debugLogger.error("Failed to start server", e)
                 isServerRunning = false
+                debugLogger.logServiceStatus("FAILED", "Server failed to start: ${e.message}")
+                
                 withContext(Dispatchers.Main) {
                     // 可以发送广播通知启动失败
                 }
@@ -116,23 +141,34 @@ class UIAutomatorService : Service() {
     /**
      * 停止HTTP服务器
      */
+    @RequiresApi(Build.VERSION_CODES.N)
     fun stopServer() {
         if (!isServerRunning) {
+            debugLogger.info("Server is not running, nothing to stop")
             return
         }
         
-        httpServer?.stop()
-        httpServer = null
-        isServerRunning = false
+        debugLogger.info("Stopping HTTP server")
         
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        Log.i(TAG, "HTTP Server stopped")
+        try {
+            httpServer?.stop()
+            httpServer = null
+            isServerRunning = false
+            
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            debugLogger.logServiceStatus("STOPPED", "Server stopped successfully")
+        } catch (e: Exception) {
+            debugLogger.error("Error stopping server", e)
+        }
     }
     
     /**
      * 获取服务器状态
      */
-    fun isRunning(): Boolean = isServerRunning
+    fun isRunning(): Boolean {
+        debugLogger.debug("Checking server status: $isServerRunning")
+        return isServerRunning
+    }
     
     /**
      * 获取当前端口
@@ -143,15 +179,26 @@ class UIAutomatorService : Service() {
      * 获取服务器URL
      */
     fun getServerUrl(): String? {
-        if (!isServerRunning) return null
+        if (!isServerRunning) {
+            debugLogger.debug("Server not running, cannot get URL")
+            return null
+        }
         
         val ipAddress = getLocalIpAddress()
-        return if (ipAddress != null) {
+        val url = if (ipAddress != null) {
             "http://$ipAddress:$currentPort"
         } else {
             "http://localhost:$currentPort"
         }
+        
+        debugLogger.debug("Server URL: $url")
+        return url
     }
+    
+    /**
+     * 获取调试日志器
+     */
+    fun getDebugLogger(): DebugLogger = debugLogger
     
     /**
      * 创建通知渠道
@@ -168,6 +215,7 @@ class UIAutomatorService : Service() {
             
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
+            debugLogger.info("Notification channel created")
         }
     }
     
@@ -191,15 +239,20 @@ class UIAutomatorService : Service() {
         
         val serverUrl = getServerUrl() ?: "http://localhost:$currentPort"
         
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("UI Automator 服务运行中")
             .setContentText("服务地址: $serverUrl")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "停止服务", stopPendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止服务", stopPendingIntent)
             .setOngoing(true)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .build()
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        }
+        
+        debugLogger.debug("Notification created with URL: $serverUrl")
+        return builder.build()
     }
     
     /**
@@ -207,13 +260,15 @@ class UIAutomatorService : Service() {
      */
     private fun getLocalIpAddress(): String? {
         try {
+            debugLogger.debug("Getting local IP address")
+            
             // 优先使用WiFi IP
             val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             val wifiInfo = wifiManager.connectionInfo
             if (wifiInfo != null && wifiManager.isWifiEnabled) {
                 val ipAddress = wifiInfo.ipAddress
                 if (ipAddress != 0) {
-                    return String.format(
+                    val ip = String.format(
                         Locale.getDefault(),
                         "%d.%d.%d.%d",
                         ipAddress and 0xff,
@@ -221,6 +276,8 @@ class UIAutomatorService : Service() {
                         ipAddress shr 16 and 0xff,
                         ipAddress shr 24 and 0xff
                     )
+                    debugLogger.debug("Found WiFi IP: $ip")
+                    return ip
                 }
             }
             
@@ -230,14 +287,19 @@ class UIAutomatorService : Service() {
                 val inetAddresses = networkInterface.inetAddresses
                 for (inetAddress in Collections.list(inetAddresses)) {
                     if (!inetAddress.isLoopbackAddress && inetAddress is InetAddress && 
-                        !inetAddress.hostAddress?.contains(":") == true) {
-                        return inetAddress.hostAddress
+                        inetAddress.hostAddress?.contains(":") != true) {
+                        val ip = inetAddress.hostAddress
+                        debugLogger.debug("Found network IP: $ip")
+                        return ip
                     }
                 }
             }
+            
+            debugLogger.warn("No suitable IP address found")
+            return null
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get local IP address", e)
+            debugLogger.error("Failed to get local IP address", e)
+            return null
         }
-        return null
     }
 }

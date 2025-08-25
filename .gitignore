@@ -1,6 +1,20 @@
+# Android
+android_service/.gradle/
+android_service/build/
+android_service/.idea/
+android_service/local.properties
+android_service/app/build/
+android_service/app/release/
+android_service/app/debug/
+android_service/app/src/main/assets/
+android_service/app/src/main/jniLibs/
+android_service/app/src/main/java/com/mcp/uiautomator/BuildConfig.java
+android_service/app/src/main/java/com/mcp/uiautomator/R.java
+
 # Python
 __pycache__/
 *.py[cod]
+/.cursor
 *$py.class
 *.so
 .Python
@@ -16,18 +30,15 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Virtual environments
-venv/
-ENV/
-env/
-.venv
+# Logs
+*.log
+mcp_server/*.log
+android_service/app/src/main/assets/logs/
 
 # IDE
 .vscode/
@@ -40,41 +51,7 @@ env/
 .DS_Store
 Thumbs.db
 
-# Android
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-
-# Android Studio
-*.hprof
-
-# Testing
-.coverage
-.pytest_cache/
-.tox/
-htmlcov/
-coverage.xml
-*.cover
-.hypothesis/
-
-# Logs
-*.log
-logs/
-/tmp/mcp-ui-automator.log
-
 # Temporary files
 *.tmp
 *.temp
-.cache/
+*.bak
